@@ -1,0 +1,21 @@
+apiVersion: kafka.strimzi.io/v1beta2
+kind: KafkaTopic
+metadata:
+  name: claims-incoming
+  labels:
+    strimzi.io/cluster: claims-cluster
+spec:
+  topicName: claims.incoming
+  partitions: 1
+  replicas: 1
+---
+apiVersion: kafka.strimzi.io/v1beta2
+kind: KafkaTopic
+metadata:
+  name: claims-processed
+  labels:
+    strimzi.io/cluster: claims-cluster
+spec:
+  topicName: claims.processed
+  partitions: 1
+  replicas: 1

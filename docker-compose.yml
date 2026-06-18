@@ -1,0 +1,26 @@
+version: "3.9"
+
+services:
+  localstack:
+    image: localstack/localstack:latest
+    container_name: task-kafka-localstack
+    ports:
+      - "4566:4566"
+    environment:
+      - SERVICES=stepfunctions,lambda,dynamodb,sns,iam
+      - DEBUG=1
+      - DEFAULT_REGION=us-east-1
+      - AWS_DEFAULT_REGION=us-east-1
+      - AWS_ACCESS_KEY_ID=test
+      - AWS_SECRET_ACCESS_KEY=test
+      - LAMBDA_EXECUTOR=docker-reuse
+      - PERSISTENCE=0
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./.localstack:/var/lib/localstack
+    healthcheck:
+      test: ["CMD-SHELL", "awslocal health | grep -q 'initialized' "]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s

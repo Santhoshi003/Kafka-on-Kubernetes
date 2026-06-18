@@ -1,0 +1,109 @@
+{
+  "Comment": "Claim processing workflow for virus scanning, OCR, fraud detection, human review, and final storage.",
+  "StartAt": "ClaimWorkflow",
+  "States": {
+    "ClaimWorkflow": {
+      "Type": "Parallel",
+      "Branches": [
+        {
+          "StartAt": "VirusScan",
+          "States": {
+            "VirusScan": {
+              "Type": "Task",
+              "Resource": "arn:aws:states:::lambda:invoke",
+              "Parameters": {
+                "FunctionName": "__VIRUS_SCAN_LAMBDA_ARN__",
+                "Payload.$": "$"
+              },
+              "ResultSelector": {
+                "scanStatus.$": "$.Payload.scanStatus",
+                "documentId.$": "$.Payload.documentId"
+              },
+              "ResultPath": "$.virusScanResult",
+              "Retry": [
+                {
+                  "ErrorEquals": ["States.ALL"],
+                  "IntervalSeconds": 2,
+                  "MaxAttempts": 3,
+                  "BackoffRate": 2.0
+                }
+              ],
+              "Next": "OCRExtract"
+            },
+            "OCRExtract": {
+              "Type": "Task",
+              "Resource": "arn:aws:states:::lambda:invoke",
+              "Parameters": {
+                "FunctionName": "__OCR_EXTRACT_LAMBDA_ARN__",
+                "Payload.$": "$"
+              },
+              "ResultSelector": {
+                "extractedText.$": "$.Payload.extractedText",
+                "documentId.$": "$.Payload.documentId"
+              },
+              "ResultPath": "$.ocrResult",
+              "Retry": [
+                {
+                  "ErrorEquals": ["States.ALL"],
+                  "IntervalSeconds": 2,
+                  "MaxAttempts": 3,
+                  "BackoffRate": 2.0
+                }
+              ],
+              "Next": "FraudDetection"
+            },
+            "FraudDetection": {
+              "Type": "Choice",
+              "Choices": [
+                {
+                  "Variable": "$.ocrResult.extractedText",
+                  "StringMatches": "*fraud*",
+                  "Next": "HumanReviewQueue"
+                }
+              ],
+              "Default": "FinalStore"
+            },
+            "HumanReviewQueue": {
+              "Type": "Wait",
+              "Seconds": 5,
+              "Next": "FinalStore"
+            },
+            "FinalStore": {
+              "Type": "Task",
+              "Resource": "arn:aws:states:::lambda:invoke",
+              "Parameters": {
+                "FunctionName": "__FINAL_STORE_LAMBDA_ARN__",
+                "Payload.$": "$"
+              },
+              "ResultSelector": {
+                "stored.$": "$.Payload.stored",
+                "documentId.$": "$.Payload.documentId",
+                "status.$": "$.Payload.status"
+              },
+              "ResultPath": "$.finalStoreResult",
+              "End": true
+            }
+          }
+        }
+      ],
+      "Catch": [
+        {
+          "ErrorEquals": ["States.ALL"],
+          "ResultPath": "$.workflowError",
+          "Next": "DeadLetterPublish"
+        }
+      ],
+      "End": true
+    },
+    "DeadLetterPublish": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::sns:publish",
+      "Parameters": {
+        "TopicArn": "__CLAIMS_DEAD_LETTER_TOPIC_ARN__",
+        "Message.$": "States.JsonToString($)",
+        "Subject": "ClaimProcessor failure"
+      },
+      "End": true
+    }
+  }
+}

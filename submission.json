@@ -1,0 +1,8 @@
+{
+  "idempotencyTest": {
+    "documentId": "claim-doc-1001",
+    "payload": {
+      "someKey": "someValue"
+    }
+  }
+}
